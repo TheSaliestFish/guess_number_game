@@ -23,6 +23,7 @@ The default range is 1–100 and the default language is Chinese. Run `python3 g
 | `--min INTEGER` | 最小值（包含）/ Inclusive lower bound | `1` |
 | `--max INTEGER` | 最大值（包含）/ Inclusive upper bound | `100` |
 | `-l`, `--language {zh,en}` | 游戏语言 / Game language | `zh` |
+| `-s`, `--source {qrng,randomorg,curby,local}` | 随机源 / Randomness source | `qrng` |
 | `-h`, `--help` | 显示帮助 / Show help | — |
 
 `--min` 必须小于 `--max`。例如，使用英文并猜测 10 到 20 之间的数字：
@@ -31,6 +32,28 @@ The default range is 1–100 and the default language is Chinese. Run `python3 g
 
 ```bash
 python3 guess_number_game.py --min 10 --max 20 --language en
+```
+
+## 随机源 | Randomness sources
+
+默认向 ANU QRNG 请求一次量子真空涨落随机数，可用 `--source` 切换：
+
+The secret number is drawn once from ANU QRNG's quantum vacuum fluctuations by default; use `--source` to switch:
+
+| `--source` | 随机源 / Source | 说明 / Notes |
+| --- | --- | --- |
+| `qrng` | ANU QRNG / 量子真空涨落 / quantum vacuum fluctuations | 返回 64 字节量子熵 / 64 bytes of quantum entropy |
+| `randomorg` | Random.org / 大气噪声 / atmospheric noise | 整数接口直接返回区间内的值 / integer API returns a value in range |
+| `curby` | CURBy / 贝尔测试量子随机信标 / Bell-test quantum beacon | 取最新一轮信标的 CID 摘要；信标按轮次更新，同一轮内多次运行会得到相同随机值 / uses the latest beacon round's CID digest, so repeats until the next round |
+| `local` | 本地伪随机 / local PRNG | 不发起网络请求 / no network request |
+
+每次启动只请求一次，**超时 2 秒**即放弃。请求超时或失败时会打印提示并改用本地随机数继续游戏，例如：
+
+Each run makes a single request with a **2 second timeout**. On timeout or failure the game prints a notice and continues with local randomness, for example:
+
+```text
+「量子真空涨落（ANU QRNG）」获取失败，已改用本地随机数。
+ANU QRNG (quantum vacuum fluctuations) is unavailable, using local random numbers instead.
 ```
 
 ## 测试 | Tests
