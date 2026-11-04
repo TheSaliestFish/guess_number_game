@@ -6,15 +6,16 @@ A small command-line number guessing game. Guess the randomly selected integer i
 
 ## 开始使用 | Getting started
 
-需要 Python 3. Run with Python 3:
+需要 Python 3。两种等价入口 / Two equivalent entry points with Python 3:
 
 ```bash
 python3 guess_number_game.py
+python3 -m guess_number_game
 ```
 
-默认范围是 1 到 100，默认使用中文。运行 `python3 guess_number_game.py --help` 查看帮助。
+默认范围是 1 到 100，默认使用中文。运行 `--help` 查看帮助。
 
-The default range is 1–100 and the default language is Chinese. Run `python3 guess_number_game.py --help` for help.
+The default range is 1–100 and the default language is Chinese. Run `--help` for help.
 
 ## 命令行选项 | Options
 
@@ -56,7 +57,35 @@ Each run makes a single request with a **2 second timeout**. On timeout or failu
 ANU QRNG (quantum vacuum fluctuations) is unavailable, using local random numbers instead.
 ```
 
+## 项目结构 | Project structure
+
+依赖方向单向：`cli → game → entropy → transport`。每个随机源是一个独立适配器，互不引用；游戏循环不认识网络，传输层不认识游戏。所有模块都不依赖第三方库。
+
+Dependencies point one way: `cli → game → entropy → transport`. Each randomness source is a standalone adapter, the game loop knows nothing about HTTP, and the transport layer knows nothing about the game. No module needs third-party packages.
+
+```text
+guess_number_game/
+├── __main__.py        # python -m guess_number_game 入口 / module entry point
+├── cli.py             # 参数解析与组装 / argument parsing and wiring
+├── game.py            # 游戏回合 + 兜底策略 / round loop and fallback policy
+├── messages.py        # 中英文文案 / localized strings
+├── transport.py       # 2 秒预算的 HTTP 客户端 / deadline-bound HTTP client
+└── entropy/
+    ├── base.py        # RandomSource 契约与异常 / source contract and errors
+    ├── anu.py         # ANU QRNG 适配器 / quantum vacuum adapter
+    ├── random_org.py  # Random.org 适配器 / atmospheric noise adapter
+    ├── curby.py       # CURBy 信标适配器 / quantum beacon adapter
+    ├── local.py       # 本地伪随机 / local PRNG
+    ├── mapping.py     # 字节 → 区间（拒绝采样）/ unbiased range mapping
+    └── cid.py         # CIDv1 摘要解析 / multihash digest parsing
+guess_number_game.py   # 兼容入口，仅转发 CLI / compatibility shim
+```
+
 ## 测试 | Tests
+
+按模块拆分，路由/适配器/游戏循环各自独立覆盖：
+
+Tests are split per module — CLI wiring, adapters, mapping and the game loop are covered independently:
 
 ```bash
 python3 -m unittest discover -s tests -v
