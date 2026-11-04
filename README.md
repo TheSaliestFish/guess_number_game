@@ -1,1 +1,9 @@
-# guess_number_game
+# 猜数字游戏
+
+一个简单的中文猜数字游戏。程序会随机选择一个 1 到 100 之间的整数，你输入猜测后，它会提示数字太大或太小，直到猜中为止。
+
+需要 Python 3，在终端运行：
+
+```bash
+python3 guess_number_game.py
+```
