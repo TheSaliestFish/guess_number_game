@@ -25,7 +25,16 @@ jobs:
           python -m pip install PyInstaller==6.22.3
           python -m PyInstaller --onefile --name guess-number-game guess_number_game.py
 
-      - name: Create GitHub release
+      - name: Publish GitHub release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$env:GITHUB_REF_NAME" dist/guess-number-game.exe README.md LICENSE --generate-notes
+          TAG: ${{ github.ref_name }}
+        shell: pwsh
+        run: |
+          gh release view $env:TAG 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG dist/guess-number-game.exe README.md LICENSE --clobber
+          }
+          else {
+            gh release create $env:TAG dist/guess-number-game.exe README.md LICENSE --generate-notes
+          }
