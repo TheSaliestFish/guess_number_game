@@ -2,7 +2,7 @@
 
 import argparse
 
-from . import entropy
+from . import __version__, entropy
 from .game import draw_answer, play
 from .messages import LANGUAGES
 
@@ -36,13 +36,14 @@ def build_parser():
     parser.add_argument(
         "-s",
         "--source",
-        choices=entropy.SOURCE_KEYS,
-        default=entropy.DEFAULT_SOURCE,
+        choices=entropy.GROUP_KEYS,
+        default=entropy.DEFAULT_GROUP,
         help=(
-            "randomness source: qrng (ANU quantum vacuum), randomorg (atmospheric noise), "
-            "curby (CURBy quantum beacon), local (default: %(default)s)"
+            "randomness family: beacon (NIST/drand/CURBy), trng (Random.org/ANU/CSRNG), "
+            "vrf (Chainlink VRF) (default: %(default)s)"
         ),
     )
+    parser.add_argument("--version", action="version", version="%(prog)s " + __version__)
     return parser
 
 

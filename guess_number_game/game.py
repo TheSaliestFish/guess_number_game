@@ -5,24 +5,23 @@ This module knows nothing about argparse, HTTP details or individual sources.
 
 from . import entropy
 from .messages import text
-from .transport import Deadline
 
 DEFAULT_TIMEOUT = 2.0
 
 
 def draw_answer(
-    source_key,
+    group_key,
     minimum,
     maximum,
     language,
     notify=print,
     timeout=DEFAULT_TIMEOUT,
 ):
-    """Draw the secret number, falling back to local randomness when the source fails."""
+    """Draw the secret number, falling back to local randomness when every source fails."""
     try:
-        return entropy.draw(source_key, minimum, maximum, Deadline(timeout))
+        return entropy.draw(group_key, minimum, maximum, timeout)
     except entropy.SourceUnavailable:
-        notify(text(language, "fallback", source=entropy.label(source_key, language)))
+        notify(text(language, "fallback", source=entropy.label(group_key, language)))
         return entropy.random_in_range(minimum, maximum)
 
 

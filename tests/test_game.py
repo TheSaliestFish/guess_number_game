@@ -41,46 +41,31 @@ class PlayTests(unittest.TestCase):
 
 
 class DrawAnswerTests(unittest.TestCase):
-    def test_returns_the_remote_value_without_a_notice(self):
+    def test_returns_the_group_value_without_a_notice(self):
         notices = []
 
         with patch.object(entropy, "draw", return_value=9) as draw:
-            answer = game.draw_answer(
-                "randomorg", 1, 10, "en", notify=notices.append, timeout=3.0
-            )
+            answer = game.draw_answer("trng", 1, 10, "en", notify=notices.append, timeout=3.0)
 
         self.assertEqual(answer, 9)
         self.assertEqual(notices, [])
-        self.assertEqual(draw.call_args[0][:3], ("randomorg", 1, 10))
+        self.assertEqual(draw.call_args[0], ("trng", 1, 10, 3.0))
 
-    def test_passes_a_deadline_matching_the_timeout(self):
-        seen = {}
+    def test_default_timeout_is_two_seconds(self):
+        with patch.object(entropy, "draw", return_value=5) as draw:
+            game.draw_answer("beacon", 1, 10, "en", notify=lambda _m: None)
 
-        def fake_draw(source_key, minimum, maximum, deadline):
-            seen["deadline"] = deadline
-            return 5
-
-        with patch.object(entropy, "draw", fake_draw):
-            game.draw_answer("curby", 1, 10, "en", notify=lambda _m: None, timeout=2.0)
-
-        self.assertGreater(seen["deadline"].remaining, 0)
-        self.assertLessEqual(seen["deadline"].remaining, 2.0)
+        self.assertEqual(draw.call_args[0][3], game.DEFAULT_TIMEOUT)
 
     def test_falls_back_to_local_randomness_and_says_so(self):
         notices = []
 
-        with patch.object(entropy, "draw", side_effect=entropy.SourceUnavailable("qrng")):
+        with patch.object(entropy, "draw", side_effect=entropy.SourceUnavailable("beacon")):
             with patch.object(entropy, "random_in_range", return_value=3) as local:
-                answer = game.draw_answer("qrng", 1, 10, "zh", notify=notices.append)
+                answer = game.draw_answer("beacon", 1, 10, "zh", notify=notices.append)
 
         self.assertEqual(answer, 3)
         local.assert_called_once_with(1, 10)
         self.assertEqual(len(notices), 1)
-        self.assertIn("量子真空涨落", notices[0])
+        self.assertIn("可验证随机信标", notices[0])
         self.assertIn("本地随机数", notices[0])
-
-    def test_local_source_never_contacts_the_network(self):
-        with patch.object(entropy.SOURCES["qrng"], "fetch") as qrng_fetch:
-            game.draw_answer("local", 1, 10, "en", notify=lambda _m: None)
-
-        qrng_fetch.assert_not_called()

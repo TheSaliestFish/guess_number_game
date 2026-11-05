@@ -22,16 +22,34 @@ class Deadline:
         return left
 
 
-def get(url, deadline, headers=None):
-    """Return the response body for `url`, giving up when `deadline` expires."""
+def _open(url, deadline, data=None, headers=None):
     request = urllib.request.Request(
         url,
+        data=data,
         headers={"User-Agent": USER_AGENT, **(headers or {})},
+        method="POST" if data is not None else "GET",
     )
     with urllib.request.urlopen(request, timeout=deadline.remaining) as response:
         return response.read().decode("utf-8")
 
 
+def get(url, deadline, headers=None):
+    """Return the response body for `url`, giving up when `deadline` expires."""
+    return _open(url, deadline, headers=headers)
+
+
 def get_json(url, deadline, headers=None):
     """Like `get`, but parse the body as JSON."""
     return json.loads(get(url, deadline, headers))
+
+
+def post_json(url, payload, deadline, headers=None):
+    """POST `payload` as JSON and parse the JSON response."""
+    body = json.dumps(payload).encode("utf-8")
+    response = _open(
+        url,
+        deadline,
+        data=body,
+        headers={"Content-Type": "application/json", **(headers or {})},
+    )
+    return json.loads(response)

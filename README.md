@@ -24,7 +24,8 @@ The default range is 1–100 and the default language is Chinese. Run `--help` f
 | `--min INTEGER` | 最小值（包含）/ Inclusive lower bound | `1` |
 | `--max INTEGER` | 最大值（包含）/ Inclusive upper bound | `100` |
 | `-l`, `--language {zh,en}` | 游戏语言 / Game language | `zh` |
-| `-s`, `--source {qrng,randomorg,curby,local}` | 随机源 / Randomness source | `qrng` |
+| `-s`, `--source {beacon,trng,vrf}` | 随机源大类 / Randomness family | `trng` |
+| `--version` | 显示版本 / Show version | — |
 | `-h`, `--help` | 显示帮助 / Show help | — |
 
 `--min` 必须小于 `--max`。例如，使用英文并猜测 10 到 20 之间的数字：
@@ -37,29 +38,40 @@ python3 guess_number_game.py --min 10 --max 20 --language en
 
 ## 随机源 | Randomness sources
 
-默认向 ANU QRNG 请求一次量子真空涨落随机数，可用 `--source` 切换：
+`--source` 只选**大类**，大类内部的所有服务会被**同时**请求，谁先给出结果就用谁的结果：
 
-The secret number is drawn once from ANU QRNG's quantum vacuum fluctuations by default; use `--source` to switch:
+`--source` picks a **family**; every service inside it is queried **concurrently** and the first answer wins:
 
-| `--source` | 随机源 / Source | 说明 / Notes |
+| `--source` | 大类 / Family | 并发请求的服务 / Sources queried in parallel |
 | --- | --- | --- |
-| `qrng` | ANU QRNG / 量子真空涨落 / quantum vacuum fluctuations | 返回 64 字节量子熵 / 64 bytes of quantum entropy |
-| `randomorg` | Random.org / 大气噪声 / atmospheric noise | 整数接口直接返回区间内的值 / integer API returns a value in range |
-| `curby` | CURBy / 贝尔测试量子随机信标 / Bell-test quantum beacon | 取最新一轮信标的 CID 摘要；信标按轮次更新，同一轮内多次运行会得到相同随机值 / uses the latest beacon round's CID digest, so repeats until the next round |
-| `local` | 本地伪随机 / local PRNG | 不发起网络请求 / no network request |
+| `beacon` | 可验证随机信标 / verifiable randomness beacons | NIST Randomness Beacon（512 位、带签名与时间戳）、drand / League of Entropy（阈值 BLS）、CURBy（贝尔测试信标，取最新一轮 CID 摘要） |
+| `trng` | 真随机 / 量子随机 API | Random.org（大气噪声）、ANU QRNG（量子真空涨落）、CSRNG Lite（NIST 认证 RNG） |
+| `vrf` | Web3 可验证随机函数 | Chainlink VRF（链上结果，需配置 RPC 与合约） |
 
-每次启动只请求一次，**超时 2 秒**即放弃。请求超时或失败时会打印提示并改用本地随机数继续游戏，例如：
+**超时规则**：所有请求发出后开始计时，**最后一个请求发出后 2 秒**仍无任何结果即判定超时；若全部源立即失败则不空等，马上回退。超时或全部失败时打印提示并用本地随机数继续游戏，例如：
 
-Each run makes a single request with a **2 second timeout**. On timeout or failure the game prints a notice and continues with local randomness, for example:
+**Timeout rule**: the clock starts once the last request has been dispatched — **two seconds after the final request** without an answer means timeout. If every source fails immediately the game falls back without waiting out the window. On timeout or total failure it prints a notice and continues with local randomness, for example:
 
 ```text
-「量子真空涨落（ANU QRNG）」获取失败，已改用本地随机数。
-ANU QRNG (quantum vacuum fluctuations) is unavailable, using local random numbers instead.
+「真随机 / 量子随机 API（Random.org / ANU QRNG / CSRNG）」获取失败，已改用本地随机数。
+true and quantum randomness APIs (Random.org / ANU QRNG / CSRNG) is unavailable, using local random numbers instead.
+```
+
+### Chainlink VRF 配置 | Chainlink VRF configuration
+
+Chainlink VRF 是链上接口，没有公开 REST 端点。配置下面三个环境变量后，游戏会用 JSON-RPC `eth_call` 读取你已实现的 VRF 消费者合约中的随机字；未配置时该源直接判为不可用并回退。
+
+Chainlink VRF is on-chain and has no public REST endpoint. With these environment variables the game reads a fulfilled random word from your VRF consumer contract through a JSON-RPC `eth_call`; without them the source is treated as unavailable.
+
+```bash
+export GUESSGAME_VRF_RPC="https://your-rpc.example"   # JSON-RPC 节点 / node
+export GUESSGAME_VRF_TO="0xYourConsumerContract"      # 消费者合约 / consumer contract
+export GUESSGAME_VRF_DATA="0x..."                     # 读取随机字的 calldata / calldata
 ```
 
 ## 项目结构 | Project structure
 
-依赖方向单向：`cli → game → entropy → transport`。每个随机源是一个独立适配器，互不引用；游戏循环不认识网络，传输层不认识游戏。所有模块都不依赖第三方库。
+依赖方向单向：`cli → game → entropy → transport`。每个随机源是一个独立适配器，互不引用；同一个大类内由 `entropy/fanout.py` 并发发起请求、取最先返回的结果；游戏循环不认识网络，传输层不认识游戏。所有模块都不依赖第三方库。
 
 Dependencies point one way: `cli → game → entropy → transport`. Each randomness source is a standalone adapter, the game loop knows nothing about HTTP, and the transport layer knows nothing about the game. No module needs third-party packages.
 
@@ -72,9 +84,14 @@ guess_number_game/
 ├── transport.py       # 2 秒预算的 HTTP 客户端 / deadline-bound HTTP client
 └── entropy/
     ├── base.py        # RandomSource 契约与异常 / source contract and errors
-    ├── anu.py         # ANU QRNG 适配器 / quantum vacuum adapter
-    ├── random_org.py  # Random.org 适配器 / atmospheric noise adapter
-    ├── curby.py       # CURBy 信标适配器 / quantum beacon adapter
+    ├── fanout.py      # 并发请求一个类别的全部源 / parallel fan-out
+    ├── nist.py        # NIST 随机信标 / NIST beacon
+    ├── drand.py       # drand / League of Entropy
+    ├── curby.py       # CURBy 信标 / Bell-test beacon
+    ├── random_org.py  # Random.org 大气噪声 / atmospheric noise
+    ├── anu.py         # ANU QRNG 量子真空涨落 / quantum vacuum
+    ├── csrng.py       # CSRNG Lite
+    ├── chainlink_vrf.py  # Chainlink VRF（链上）/ on-chain VRF
     ├── local.py       # 本地伪随机 / local PRNG
     ├── mapping.py     # 字节 → 区间（拒绝采样）/ unbiased range mapping
     └── cid.py         # CIDv1 摘要解析 / multihash digest parsing
