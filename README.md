@@ -102,3 +102,9 @@ Pushing a version tag matching `v*` (for example, `v1.0.0`) triggers GitHub Acti
 本项目以 MIT License 开源，详见 [LICENSE](LICENSE)。
 
 Released under the MIT License. See [LICENSE](LICENSE).
+
+## 贡献者与署名 | Contributors and attribution
+
+人类维护者与 AI 编程智能体共同开发，智能体通过提交的 `Co-authored-by` 尾注署名，不持有仓库权限。详见 [CONTRIBUTORS.md](CONTRIBUTORS.md)。
+
+Built by a human maintainer together with AI coding agents; agents are credited via `Co-authored-by` trailers and hold no repository access. See [CONTRIBUTORS.md](CONTRIBUTORS.md).
